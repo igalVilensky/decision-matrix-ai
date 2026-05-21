@@ -372,9 +372,7 @@ export const CreateMatrixForm = ({ onCreate }: CreateMatrixFormProps) => {
 
       const removeInitialOption = (index: number) => {
         setInitialOptions((currentOptions) =>
-          currentOptions.length <= 1
-            ? [""]
-            : currentOptions.filter((_, optionIndex) => optionIndex !== index)
+          currentOptions.filter((_, optionIndex) => optionIndex !== index)
         );
       };
 
@@ -387,30 +385,49 @@ export const CreateMatrixForm = ({ onCreate }: CreateMatrixFormProps) => {
               options later.
             </p>
           </div>
-          <div className="space-y-3">
-            {initialOptions.map((option, index) => (
-              <div key={index} className="flex items-start gap-2">
-                <Input
-                  label={index === 0 ? "Option names" : undefined}
-                  placeholder={optionPlaceholders[index] ?? "Another option"}
-                  value={option}
-                  onChange={(event) => updateInitialOption(index, event.target.value)}
-                />
-                <Button
-                  className={index === 0 ? "mt-7" : ""}
-                  variant="ghost"
-                  size="icon"
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => removeInitialOption(index)}
-                >
-                  Remove option field
-                </Button>
+          {initialOptions.length > 0 ? (
+            <>
+              <div className="space-y-3">
+                {initialOptions.map((option, index) => (
+                  <div key={index} className="flex items-start gap-2">
+                    <Input
+                      label={index === 0 ? "Option names" : undefined}
+                      placeholder={optionPlaceholders[index] ?? "Another option"}
+                      value={option}
+                      onChange={(event) => updateInitialOption(index, event.target.value)}
+                    />
+                    <Button
+                      className={index === 0 ? "mt-7" : ""}
+                      variant="ghost"
+                      size="icon"
+                      icon={<Trash2 className="h-4 w-4" />}
+                      onClick={() => removeInitialOption(index)}
+                    >
+                      Remove option field
+                    </Button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <Button variant="outline" icon={<Plus className="h-4 w-4" />} onClick={addInitialOption}>
-            Add another option
-          </Button>
+              <Button variant="outline" icon={<Plus className="h-4 w-4" />} onClick={addInitialOption}>
+                Add another option
+              </Button>
+            </>
+          ) : (
+            <div className="rounded-lg border border-dashed border-ink-200 bg-white p-5">
+              <h4 className="font-bold text-ink-900">No options added yet.</h4>
+              <p className="mt-1 max-w-xl text-sm leading-6 text-ink-500">
+                You can skip this step and ask AI to suggest options later, or add one now.
+              </p>
+              <Button
+                className="mt-4"
+                variant="outline"
+                icon={<Plus className="h-4 w-4" />}
+                onClick={addInitialOption}
+              >
+                Add option
+              </Button>
+            </div>
+          )}
         </div>
       );
     }
