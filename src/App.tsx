@@ -19,6 +19,13 @@ import { currentTimestamp } from "./utils/dates";
 type Route = { name: "home" } | { name: "matrix"; id: string };
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
+const MATRIX_SAVE_DEBOUNCE_MS = 700;
+
+const sortMatricesByUpdatedAt = (items: DecisionMatrix[]): DecisionMatrix[] =>
+  [...items].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+
 const parseRoute = (): Route => {
   const hash = window.location.hash.replace(/^#\/?/, "");
   if (hash.startsWith("matrix/")) {
@@ -43,7 +50,13 @@ export const App = () => {
   const [dataError, setDataError] = useState<string | undefined>();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
-  const saveTimer = useRef<number | undefined>();
+  const debounceSaveTimer = useRef<number | undefined>();
+  const saveStatusTimer = useRef<number | undefined>();
+  const pendingSaveMatrix = useRef<DecisionMatrix | undefined>();
+  const saveVersion = useRef(0);
+  const inFlightSave = useRef<Promise<void> | undefined>();
+  const inFlightSaveMatrixId = useRef<string | undefined>();
+  const isMounted = useRef(true);
 
   useEffect(() => {
     const onHashChange = () => setRoute(parseRoute());
@@ -52,10 +65,18 @@ export const App = () => {
   }, []);
 
   useEffect(
-    () => () => {
-      if (saveTimer.current) {
-        window.clearTimeout(saveTimer.current);
-      }
+    () => {
+      isMounted.current = true;
+
+      return () => {
+        isMounted.current = false;
+        if (debounceSaveTimer.current) {
+          window.clearTimeout(debounceSaveTimer.current);
+        }
+        if (saveStatusTimer.current) {
+          window.clearTimeout(saveStatusTimer.current);
+        }
+      };
     },
     []
   );
@@ -98,7 +119,20 @@ export const App = () => {
             uid,
             (nextMatrices) => {
               if (!isActive) return;
-              setMatrices(nextMatrices);
+              const pendingMatrix = pendingSaveMatrix.current;
+              if (!pendingMatrix) {
+                setMatrices(nextMatrices);
+              } else {
+                setMatrices(
+                  sortMatricesByUpdatedAt(
+                    nextMatrices.some((matrix) => matrix.id === pendingMatrix.id)
+                      ? nextMatrices.map((matrix) =>
+                          matrix.id === pendingMatrix.id ? pendingMatrix : matrix
+                        )
+                      : [pendingMatrix, ...nextMatrices]
+                  )
+                );
+              }
               setDataError(undefined);
               setIsDataLoading(false);
             },
@@ -127,34 +161,151 @@ export const App = () => {
     [matrices, route]
   );
 
-  const markSavedSoon = () => {
-    window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => setSaveStatus("saved"), 120);
-    window.setTimeout(() => setSaveStatus("idle"), 1600);
+  const clearDebouncedSaveTimer = () => {
+    if (debounceSaveTimer.current) {
+      window.clearTimeout(debounceSaveTimer.current);
+      debounceSaveTimer.current = undefined;
+    }
   };
 
-  const handleSaveMatrix = async (matrix: DecisionMatrix) => {
+  const clearSaveStatusTimer = () => {
+    if (saveStatusTimer.current) {
+      window.clearTimeout(saveStatusTimer.current);
+      saveStatusTimer.current = undefined;
+    }
+  };
+
+  const hasOutstandingEditSave = () =>
+    Boolean(pendingSaveMatrix.current || debounceSaveTimer.current || inFlightSave.current);
+
+  const markSaving = () => {
+    clearSaveStatusTimer();
+    if (!isMounted.current) return;
+    setSaveStatus("saving");
+  };
+
+  const markSavedSoon = () => {
+    clearSaveStatusTimer();
+    if (!isMounted.current) return;
+
+    if (hasOutstandingEditSave()) {
+      setSaveStatus("saving");
+      return;
+    }
+
+    setSaveStatus("saved");
+    saveStatusTimer.current = window.setTimeout(() => {
+      if (!isMounted.current || hasOutstandingEditSave()) return;
+      setSaveStatus("idle");
+    }, 1600);
+  };
+
+  const setOptimisticMatrix = (matrix: DecisionMatrix) => {
+    setMatrices((current) =>
+      sortMatricesByUpdatedAt(
+        current.map((item) => (item.id === matrix.id ? matrix : item))
+      )
+    );
+  };
+
+  const waitForInFlightSave = async (matrixId?: string) => {
+    const savePromise = inFlightSave.current;
+    if (!savePromise) return;
+    if (matrixId && inFlightSaveMatrixId.current !== matrixId) return;
+
+    await savePromise;
+  };
+
+  const flushPendingMatrixSave = async (
+    matrixId?: string,
+    shouldMarkSaved = true
+  ): Promise<void> => {
     if (!uid) {
       setDataError("Cannot save until Firebase authentication is ready.");
       setSaveStatus("error");
       return;
     }
 
-    setSaveStatus("saving");
-    const optimisticMatrix = { ...matrix, updatedAt: currentTimestamp() };
-    setMatrices((current) =>
-      current
-        .map((item) => (item.id === optimisticMatrix.id ? optimisticMatrix : item))
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-    );
-
-    try {
-      await saveMatrix(uid, optimisticMatrix);
-      markSavedSoon();
-    } catch (error) {
-      setSaveStatus("error");
-      setDataError(error instanceof Error ? error.message : "Could not save matrix.");
+    if (matrixId && pendingSaveMatrix.current?.id !== matrixId) {
+      await waitForInFlightSave(matrixId);
+      return;
     }
+
+    clearDebouncedSaveTimer();
+    await waitForInFlightSave(matrixId);
+    if (!isMounted.current) return;
+
+    const matrixToSave = pendingSaveMatrix.current;
+    if (!matrixToSave) return;
+    if (matrixId && matrixToSave.id !== matrixId) return;
+
+    clearDebouncedSaveTimer();
+    const versionToSave = saveVersion.current;
+    const savePromise = (async () => {
+      let didSaveLatestMatrix = false;
+
+      try {
+        const saved = await saveMatrix(uid, matrixToSave);
+        if (!isMounted.current) return;
+
+        const isLatestSave =
+          versionToSave === saveVersion.current &&
+          pendingSaveMatrix.current?.id === saved.id;
+
+        if (!isLatestSave) return;
+
+        pendingSaveMatrix.current = undefined;
+        setMatrices((current) =>
+          sortMatricesByUpdatedAt(
+            current.map((item) => (item.id === saved.id ? saved : item))
+          )
+        );
+        didSaveLatestMatrix = true;
+      } catch (error) {
+        if (!isMounted.current || versionToSave !== saveVersion.current) return;
+        clearSaveStatusTimer();
+        setSaveStatus("error");
+        setDataError(error instanceof Error ? error.message : "Could not save matrix.");
+      } finally {
+        inFlightSave.current = undefined;
+        inFlightSaveMatrixId.current = undefined;
+      }
+
+      if (didSaveLatestMatrix && shouldMarkSaved) {
+        markSavedSoon();
+      }
+    })();
+
+    inFlightSave.current = savePromise;
+    inFlightSaveMatrixId.current = matrixToSave.id;
+
+    await savePromise;
+  };
+
+  const discardPendingMatrixSave = (matrixId: string) => {
+    if (pendingSaveMatrix.current?.id !== matrixId) return;
+
+    clearDebouncedSaveTimer();
+    pendingSaveMatrix.current = undefined;
+    saveVersion.current += 1;
+  };
+
+  const handleSaveMatrix = (matrix: DecisionMatrix) => {
+    if (!uid) {
+      setDataError("Cannot save until Firebase authentication is ready.");
+      setSaveStatus("error");
+      return;
+    }
+
+    const optimisticMatrix = { ...matrix, updatedAt: currentTimestamp() };
+    pendingSaveMatrix.current = optimisticMatrix;
+    saveVersion.current += 1;
+    markSaving();
+    setOptimisticMatrix(optimisticMatrix);
+    clearDebouncedSaveTimer();
+    debounceSaveTimer.current = window.setTimeout(() => {
+      void flushPendingMatrixSave();
+    }, MATRIX_SAVE_DEBOUNCE_MS);
   };
 
   const handleCreateMatrix = async (matrix: DecisionMatrix) => {
@@ -163,9 +314,10 @@ export const App = () => {
       return;
     }
 
-    setSaveStatus("saving");
+    markSaving();
     try {
       const saved = await saveMatrix(uid, matrix);
+      if (!isMounted.current) return;
       setIsCreateOpen(false);
       navigateMatrix(saved.id);
       markSavedSoon();
@@ -181,9 +333,12 @@ export const App = () => {
       return;
     }
 
-    setSaveStatus("saving");
+    markSaving();
     try {
+      await flushPendingMatrixSave(id, false);
+      if (!isMounted.current) return;
       const duplicate = await duplicateMatrix(uid, id);
+      if (!isMounted.current) return;
       markSavedSoon();
       if (!duplicate) return;
       navigateMatrix(duplicate.id);
@@ -202,9 +357,14 @@ export const App = () => {
     const shouldDelete = window.confirm("Delete this matrix? This cannot be undone.");
     if (!shouldDelete) return;
 
-    setSaveStatus("saving");
+    markSaving();
+    discardPendingMatrixSave(id);
+    await waitForInFlightSave(id);
+    if (!isMounted.current) return;
+
     try {
       await deleteMatrix(uid, id);
+      if (!isMounted.current) return;
       markSavedSoon();
       if (route.name === "matrix" && route.id === id) {
         navigateHome();
@@ -220,9 +380,10 @@ export const App = () => {
       throw new Error("Cannot import until Firebase authentication is ready.");
     }
 
-    setSaveStatus("saving");
+    markSaving();
     try {
       const saved = await saveMatrix(uid, matrix);
+      if (!isMounted.current) return;
       navigateMatrix(saved.id);
       markSavedSoon();
     } catch (error) {
