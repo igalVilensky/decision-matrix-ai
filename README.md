@@ -153,6 +153,7 @@ Firestore document paths:
 ```text
 users/{uid}/matrices/{matrixId}
 users/{uid}/meta/app
+users/{uid}/usage/{YYYY-MM-DD}
 ```
 
 Security rules:
@@ -167,6 +168,10 @@ service cloud.firestore {
     }
 
     match /users/{userId}/meta/{documentId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/usage/{dateKey} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }

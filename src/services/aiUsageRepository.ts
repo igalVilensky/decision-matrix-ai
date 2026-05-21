@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, runTransaction } from "firebase/firestore";
 import { currentTimestamp } from "../utils/dates";
 import { getFirebaseServices } from "./firebase";
 
@@ -39,25 +39,28 @@ export const incrementDailyAiUsage = async (
 ): Promise<number> => {
   const { db } = getFirebaseServices();
   const documentRef = doc(db, ...usageDocumentPath(uid, dateKey));
-  const snapshot = await getDoc(documentRef);
-  const currentCount = snapshot.exists()
-    ? readCount(snapshot.data() as DailyAiUsageDocument)
-    : 0;
 
-  if (currentCount >= limit) {
-    throw new Error(`You have used ${currentCount} of ${limit} AI requests today.`);
-  }
+  return runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(documentRef);
+    const currentCount = snapshot.exists()
+      ? readCount(snapshot.data() as DailyAiUsageDocument)
+      : 0;
 
-  const nextCount = currentCount + 1;
-  await setDoc(
-    documentRef,
-    {
-      count: nextCount,
-      date: dateKey,
-      updatedAt: currentTimestamp()
-    },
-    { merge: true }
-  );
+    if (currentCount >= limit) {
+      throw new Error(`You have used ${currentCount} of ${limit} AI requests today.`);
+    }
 
-  return nextCount;
+    const nextCount = currentCount + 1;
+    transaction.set(
+      documentRef,
+      {
+        count: nextCount,
+        date: dateKey,
+        updatedAt: currentTimestamp()
+      },
+      { merge: true }
+    );
+
+    return nextCount;
+  });
 };
