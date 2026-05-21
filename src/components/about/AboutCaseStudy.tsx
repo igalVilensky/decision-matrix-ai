@@ -13,7 +13,7 @@ const sections: CaseStudySection[] = [
   },
   {
     title: "Solution",
-    body: "Decision Matrix AI turns an uncertain choice into a guided workflow: describe the decision, add options, define weighted criteria, score tradeoffs, and review explainable results."
+    body: "Decision Matrix AI turns an uncertain choice into a guided workflow: describe the decision, add options, define weighted criteria, score tradeoffs, review explainable results, and turn the decision into action."
   },
   {
     title: "How it works",
@@ -21,7 +21,7 @@ const sections: CaseStudySection[] = [
   },
   {
     title: "AI architecture",
-    body: "Groq calls go through Netlify Functions so the API key is never exposed in frontend code. AI can suggest options, criteria, scores, reviews, and recommendations."
+    body: "Groq calls go through Netlify Functions so the API key is never exposed in frontend code. AI can suggest options, criteria, scores, reviews, recommendations, and action checklists."
   },
   {
     title: "Data and persistence",
@@ -29,11 +29,15 @@ const sections: CaseStudySection[] = [
   },
   {
     title: "Decision logic",
-    body: "Weighted scoring ranks options, highlights must-have failures, explains category performance, and adds decision insights such as stability, confidence, key drivers, and weak spots."
+    body: "Weighted scoring ranks options, highlights must-have failures, explains category performance, and adds decision insights such as stability, confidence, key drivers, weak spots, and action readiness."
   },
   {
     title: "Trust and safety choices",
-    body: "Zod validates imported data and AI responses. AI suggestions stay editable and must be reviewed before being applied. Anonymous users have daily AI request limits."
+    body: "Zod validates imported data and AI responses. AI suggestions, including action checklists, stay editable and must be reviewed before being saved. Anonymous users have daily AI request limits."
+  },
+  {
+    title: "Decision-to-Action Agent",
+    body: "The agent adapts checklist output to the decision type, such as purchase checks, rollouts, bookings, negotiations, implementation plans, or learning plans."
   },
   {
     title: "Future improvements",

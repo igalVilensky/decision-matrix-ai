@@ -6,13 +6,16 @@ type AiAction =
   | "suggestOptions"
   | "suggestScores"
   | "reviewMatrix"
-  | "generateRecommendation";
+  | "generateRecommendation"
+  | "generateActionChecklist";
 
 type IncomingRequest = {
   action: AiAction;
   matrix: Record<string, unknown>;
   extraInstructions?: string;
   ranking?: unknown;
+  results?: unknown;
+  insights?: unknown;
 };
 
 type ChatMessage = {
@@ -43,7 +46,8 @@ const actions: AiAction[] = [
   "suggestOptions",
   "suggestScores",
   "reviewMatrix",
-  "generateRecommendation"
+  "generateRecommendation",
+  "generateActionChecklist"
 ];
 
 const systemPrompt = `You are an expert decision analyst helping users build weighted decision matrices. The app can compare anything: products, tools, jobs, apartments, travel destinations, vendors, courses, business ideas, universities, laptops, cities, or personal decisions. Generate practical, relevant, non-generic criteria. Be neutral, transparent, and decision-focused. Do not invent hard facts when uncertain. If the available information is limited, use cautious language, especially when scoring based only on user-provided information. The user remains in control and AI suggestions are not final decisions. Return valid JSON only. Do not include markdown. Do not include explanations outside the JSON object.`;
@@ -89,11 +93,19 @@ const parseRequest = (event: HandlerEvent): IncomingRequest => {
     action: parsed.action,
     matrix: parsed.matrix,
     extraInstructions: parsed.extraInstructions,
-    ranking: parsed.ranking
+    ranking: parsed.ranking ?? parsed.results,
+    results: parsed.results,
+    insights: parsed.insights
   };
 };
 
-const getActionPrompt = ({ action, matrix, extraInstructions, ranking }: IncomingRequest) => {
+const getActionPrompt = ({
+  action,
+  matrix,
+  extraInstructions,
+  ranking,
+  insights
+}: IncomingRequest) => {
   const compactMatrix = JSON.stringify(matrix, null, 2);
   const instructions = extraInstructions?.trim()
     ? `\nExtra user instructions:\n${extraInstructions.trim()}`
@@ -166,6 +178,51 @@ ${compactMatrix}${instructions}`;
 
 Matrix:
 ${compactMatrix}${instructions}`;
+  }
+
+  if (action === "generateActionChecklist") {
+    return `Generate a practical decision-to-action checklist for this matrix. Classify the decision into exactly one checklistType:
+- purchase_checklist for consumer/product buying decisions
+- trial_rollout_plan for tool, vendor, or SaaS selections
+- booking_plan for travel or event booking decisions
+- negotiation_plan for job offers or agreement decisions
+- viewing_contract_plan for apartment, housing, or lease decisions
+- proof_of_concept_plan for technical architecture or engineering decisions
+- learning_plan for course or education decisions
+- implementation_plan for operational or project decisions
+- general_action_plan when no specific type fits
+
+Use the current winner, score results, must-have failures, weak spots, constraints, and confidence/stability context. Generate 3 to 12 concrete actions that help the user act on the winning option without blindly trusting the score. Include validation checks before commitment and risks to watch. If the result is sensitive, low-confidence, or the winner fails must-have criteria, include caution and validation steps before committing. Do not give generic advice. Do not say "do more research" unless you specify exactly what to check.
+
+Return this exact JSON shape:
+{
+  "checklistType": "booking_plan",
+  "title": "Book Lisbon with confidence",
+  "summary": "Lisbon is the current winner, but validate accommodation, internet, and total cost before committing.",
+  "actions": [
+    {
+      "phase": "Before committing",
+      "task": "Check accommodation prices for your exact dates.",
+      "reason": "Budget is a high-weight criterion and prices can change quickly.",
+      "priority": "high"
+    }
+  ],
+  "validationChecks": [
+    "Confirm reliable Wi-Fi or coworking access near the accommodation."
+  ],
+  "risksToWatch": [
+    "Final cost may exceed the budget if accommodation prices rise."
+  ]
+}
+
+Matrix:
+${compactMatrix}
+
+Calculated results:
+${JSON.stringify(ranking ?? null, null, 2)}
+
+Decision insights:
+${JSON.stringify(insights ?? null, null, 2)}${instructions}`;
   }
 
   return `Generate an explainable recommendation using the full matrix and calculated ranking. Respect the weighted score results, but call out tradeoffs, risks, and validation steps. The user remains responsible for the final decision. Return this exact JSON shape:
@@ -272,7 +329,7 @@ export const handler: Handler = async (event) => {
         model,
         messages,
         temperature: 0.2,
-        max_tokens: 1800,
+        max_tokens: 2200,
         response_format: { type: "json_object" }
       })
     });

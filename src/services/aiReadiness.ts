@@ -90,6 +90,16 @@ export const getAiActionReadiness = (
         };
   }
 
+  if (action === "generateActionChecklist") {
+    return readyOptionCount >= 2 && readyCriterionCount >= 3 && hasAnyUsableScore(matrix)
+      ? { isReady: true }
+      : {
+          isReady: false,
+          reason:
+            "Add at least 2 options, 3 criteria, and some scores before generating an action checklist."
+        };
+  }
+
   if (action === "reviewMatrix") {
     return readyOptionCount >= 1 || readyCriterionCount >= 1
       ? { isReady: true }

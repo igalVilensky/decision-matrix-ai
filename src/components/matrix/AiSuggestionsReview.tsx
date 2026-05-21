@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { clampScore, clampWeight } from "../../services/scoring";
 import type {
+  ActionChecklistSuggestion,
+  ActionPriority,
   AiSuggestion,
   CriteriaSuggestion,
   MatrixReview,
@@ -22,7 +24,8 @@ export type ReviewedSuggestion =
   | (AiSuggestion<OptionSuggestion> & { type: "options" })
   | (AiSuggestion<ScoreSuggestion> & { type: "scores" })
   | (AiSuggestion<MatrixReview> & { type: "quality-review" })
-  | (AiSuggestion<Recommendation> & { type: "summary" });
+  | (AiSuggestion<Recommendation> & { type: "summary" })
+  | (AiSuggestion<ActionChecklistSuggestion> & { type: "action-checklist" });
 
 type AiSuggestionsReviewProps = {
   suggestion?: ReviewedSuggestion;
@@ -31,6 +34,12 @@ type AiSuggestionsReviewProps = {
 };
 
 const confidenceOptions: ScoreConfidence[] = ["low", "medium", "high"];
+const priorityOptions: ActionPriority[] = ["low", "medium", "high"];
+const priorityTone: Record<ActionPriority, "default" | "amber" | "red"> = {
+  low: "default",
+  medium: "amber",
+  high: "red"
+};
 
 const renderList = (items: string[], emptyText: string) =>
   items.length > 0 ? (
@@ -402,6 +411,207 @@ export const AiSuggestionsReview = ({
           <div className="rounded-lg bg-ink-50 p-4">
             <h4 className="font-bold text-ink-900">Suggestions</h4>
             {renderList(editableSuggestion.data.suggestions, "No suggestions returned.")}
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  if (editableSuggestion.type === "action-checklist") {
+    const updateChecklist = (updates: Partial<ActionChecklistSuggestion>) => {
+      setEditableSuggestion({
+        ...editableSuggestion,
+        data: {
+          ...editableSuggestion.data,
+          ...updates
+        }
+      });
+    };
+
+    const updateAction = (
+      index: number,
+      updates: Partial<ActionChecklistSuggestion["actions"][number]>
+    ) => {
+      updateChecklist({
+        actions: editableSuggestion.data.actions.map((action, actionIndex) =>
+          actionIndex === index ? { ...action, ...updates } : action
+        )
+      });
+    };
+
+    const removeAction = (index: number) => {
+      updateChecklist({
+        actions: editableSuggestion.data.actions.filter((_, actionIndex) => actionIndex !== index)
+      });
+    };
+
+    const removeValidationCheck = (index: number) => {
+      updateChecklist({
+        validationChecks: editableSuggestion.data.validationChecks.filter(
+          (_, checkIndex) => checkIndex !== index
+        )
+      });
+    };
+
+    const removeRisk = (index: number) => {
+      updateChecklist({
+        risksToWatch: editableSuggestion.data.risksToWatch.filter(
+          (_, riskIndex) => riskIndex !== index
+        )
+      });
+    };
+
+    const phases = Array.from(new Set(editableSuggestion.data.actions.map((action) => action.phase)));
+
+    return (
+      <Card className="p-5">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <Badge tone="blue">Decision-to-action agent</Badge>
+            <h3 className="mt-2 text-lg font-bold text-ink-900">
+              Review and edit action checklist
+            </h3>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onReject}>
+              Reject
+            </Button>
+            <Button
+              disabled={editableSuggestion.data.actions.length === 0}
+              onClick={() => onAccept(editableSuggestion)}
+            >
+              Save checklist
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+          <div className="space-y-3 rounded-lg border border-ink-100 bg-ink-50 p-4">
+            <Badge>{editableSuggestion.data.checklistType.replace(/_/g, " ")}</Badge>
+            <Input
+              label="Title"
+              value={editableSuggestion.data.title}
+              onChange={(event) => updateChecklist({ title: event.target.value })}
+            />
+            <Textarea
+              label="Summary"
+              value={editableSuggestion.data.summary}
+              onChange={(event) => updateChecklist({ summary: event.target.value })}
+            />
+          </div>
+
+          <div className="space-y-4">
+            {phases.map((phase) => (
+              <div key={phase} className="rounded-lg border border-ink-100 bg-ink-50 p-4">
+                <h4 className="font-bold text-ink-900">{phase}</h4>
+                <div className="mt-3 space-y-3">
+                  {editableSuggestion.data.actions.map((action, index) =>
+                    action.phase === phase ? (
+                      <div key={`${phase}-${index}`} className="rounded-lg bg-white p-3">
+                        <div className="mb-3 flex items-start justify-between gap-3">
+                          <Badge tone={priorityTone[action.priority]}>{action.priority} priority</Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            icon={<Trash2 className="h-4 w-4" />}
+                            onClick={() => removeAction(index)}
+                          >
+                            Remove action item
+                          </Button>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px]">
+                          <Input
+                            label="Task"
+                            value={action.task}
+                            onChange={(event) => updateAction(index, { task: event.target.value })}
+                          />
+                          <label className="space-y-1.5">
+                            <span className="text-sm font-semibold text-ink-700">Priority</span>
+                            <select
+                              className="min-h-11 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm font-semibold text-ink-900 shadow-sm"
+                              value={action.priority}
+                              onChange={(event) =>
+                                updateAction(index, {
+                                  priority: event.target.value as ActionPriority
+                                })
+                              }
+                            >
+                              {priorityOptions.map((priority) => (
+                                <option key={priority} value={priority}>
+                                  {priority}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <div className="md:col-span-2">
+                            <Textarea
+                              label="Reason"
+                              value={action.reason}
+                              onChange={(event) =>
+                                updateAction(index, { reason: event.target.value })
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : null
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="rounded-lg bg-brand-50 p-4">
+            <h4 className="font-bold text-brand-700">Validation checks</h4>
+            {editableSuggestion.data.validationChecks.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {editableSuggestion.data.validationChecks.map((check, index) => (
+                  <div
+                    key={`${check}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm text-ink-700"
+                  >
+                    <span>{check}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      icon={<Trash2 className="h-4 w-4" />}
+                      onClick={() => removeValidationCheck(index)}
+                    >
+                      Remove validation check
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-ink-500">No validation checks included.</p>
+            )}
+          </div>
+          <div className="rounded-lg bg-coral-50 p-4">
+            <h4 className="font-bold text-coral-600">Risks to watch</h4>
+            {editableSuggestion.data.risksToWatch.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {editableSuggestion.data.risksToWatch.map((risk, index) => (
+                  <div
+                    key={`${risk}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm text-ink-700"
+                  >
+                    <span>{risk}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      icon={<Trash2 className="h-4 w-4" />}
+                      onClick={() => removeRisk(index)}
+                    >
+                      Remove risk
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-ink-500">No risks included.</p>
+            )}
           </div>
         </div>
       </Card>

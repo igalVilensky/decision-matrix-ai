@@ -210,7 +210,13 @@ export const MatrixPage = ({
       {activeTab === "criteria" ? <CriteriaEditor matrix={matrix} onChange={onChange} /> : null}
       {activeTab === "scoring" ? <ScoringTable matrix={matrix} onChange={onChange} /> : null}
       {activeTab === "matrix" ? <MatrixAnalysisView matrix={matrix} /> : null}
-      {activeTab === "results" ? <ResultsDashboard matrix={matrix} /> : null}
+      {activeTab === "results" ? (
+        <ResultsDashboard
+          matrix={matrix}
+          onChange={onChange}
+          onRequestAiAction={openAiAction}
+        />
+      ) : null}
       {activeTab === "ai" ? (
         <AiAssistantPanel
           matrix={matrix}

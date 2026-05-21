@@ -2,7 +2,7 @@
 
 Decision Matrix AI is a portfolio-quality React app for comparing complex choices with an AI-assisted weighted decision matrix. It can compare software tools, products, jobs, apartments, travel destinations, courses, vendors, business ideas, universities, laptops, cities, or any other decision with meaningful tradeoffs.
 
-The app turns a vague decision into options, criteria, adjustable weights, manual or AI-suggested scores, ranked results, category breakdowns, must-have failures, and an explainable recommendation.
+The app turns a vague decision into options, criteria, adjustable weights, manual or AI-suggested scores, ranked results, category breakdowns, must-have failures, an explainable recommendation, and a practical action checklist.
 
 ## Features
 
@@ -19,7 +19,9 @@ The app turns a vague decision into options, criteria, adjustable weights, manua
   - score suggestions
   - matrix quality review
   - final recommendation generation
+  - decision-to-action checklist generation
 - Review, edit, partially accept, or reject AI suggestions before they affect the matrix.
+- Turn a winning option into an action checklist for purchase checks, rollouts, bookings, negotiation, implementation, or learning plans.
 - Store each user's matrices in Firestore under `users/{uid}/matrices/{matrixId}`.
 - Sign users in with Firebase Anonymous Authentication.
 - Import and export matrix JSON backups.
@@ -196,6 +198,17 @@ Request:
 }
 ```
 
+Supported AI actions:
+
+```text
+generateCriteria
+suggestOptions
+suggestScores
+reviewMatrix
+generateRecommendation
+generateActionChecklist
+```
+
 Success:
 
 ```json
@@ -228,7 +241,7 @@ Failure:
 
 ## Import and Export
 
-Each matrix can be exported as JSON from the matrix header. Imported JSON is validated with Zod, assigned a new matrix id, and saved as a new Firestore document so existing matrices are not overwritten.
+Each matrix can be exported as JSON from the matrix header. Imported JSON is validated with Zod, assigned a new matrix id, and saved as a new Firestore document so existing matrices are not overwritten. Saved AI summaries and action checklists are included in exports.
 
 ## Future Improvements
 

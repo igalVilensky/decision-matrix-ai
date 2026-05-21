@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ClipboardCheck,
+  ClipboardList,
   Lightbulb,
   ListChecks,
   MessageSquareText,
   Sparkles
 } from "lucide-react";
 import * as aiClient from "../../services/aiClient";
+import { calculateDecisionInsights } from "../../services/decisionInsights";
 import { getAiActionReadiness } from "../../services/aiReadiness";
 import {
   ANONYMOUS_DAILY_AI_LIMIT,
@@ -16,6 +18,7 @@ import {
 } from "../../services/aiUsageRepository";
 import { calculateMatrixResults, clampScore, clampWeight } from "../../services/scoring";
 import type {
+  ActionChecklistSuggestion,
   AiAction,
   CriteriaSuggestion,
   DecisionMatrix,
@@ -84,6 +87,12 @@ const actionConfigs: AiActionConfig[] = [
     action: "generateRecommendation",
     label: "Generate recommendation",
     icon: <MessageSquareText className="h-4 w-4" />,
+    variant: "primary"
+  },
+  {
+    action: "generateActionChecklist",
+    label: "Generate action checklist",
+    icon: <ClipboardList className="h-4 w-4" />,
     variant: "primary"
   }
 ];
@@ -238,6 +247,12 @@ export const AiAssistantPanel = ({
         const data = await aiClient.generateRecommendation(matrix, results, guidance);
         setSuggestion(createSuggestion<Recommendation>("summary", data));
       }
+      if (action === "generateActionChecklist") {
+        const results = calculateMatrixResults(matrix);
+        const insights = calculateDecisionInsights(matrix, results);
+        const data = await aiClient.generateActionChecklist(matrix, results, insights, guidance);
+        setSuggestion(createSuggestion<ActionChecklistSuggestion>("action-checklist", data));
+      }
     } catch (caughtError) {
       const message =
         caughtError instanceof Error
@@ -366,6 +381,39 @@ export const AiAssistantPanel = ({
       return;
     }
 
+    if (suggestion.type === "action-checklist") {
+      const results = calculateMatrixResults(matrix);
+      const winner = results.winner;
+      const timestamp = currentTimestamp();
+
+      onChange({
+        ...matrix,
+        actionChecklist: {
+          id: createId("checklist"),
+          type: suggestion.data.checklistType,
+          title: suggestion.data.title,
+          summary: suggestion.data.summary,
+          generatedForOptionId: winner?.option.id,
+          generatedForOptionName: winner?.option.name,
+          items: suggestion.data.actions.map((action) => ({
+            id: createId("action"),
+            phase: action.phase,
+            task: action.task,
+            reason: action.reason,
+            priority: action.priority,
+            status: "todo"
+          })),
+          validationChecks: suggestion.data.validationChecks,
+          risksToWatch: suggestion.data.risksToWatch,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          aiGenerated: true
+        }
+      });
+      setSuggestion(undefined);
+      return;
+    }
+
     setSuggestion(undefined);
   };
 
@@ -410,7 +458,7 @@ export const AiAssistantPanel = ({
             }
           />
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           {actionConfigs.map((config) => {
             const unavailableReason = getUnavailableReason(config.action);
             const isCurrentActionLoading = loadingAction === config.action;

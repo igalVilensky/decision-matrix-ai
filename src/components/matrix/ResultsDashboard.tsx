@@ -1,4 +1,5 @@
-import type { DecisionMatrix } from "../../types/matrix";
+import { ClipboardList, Trash2 } from "lucide-react";
+import type { ActionChecklistItem, ActionPriority, AiAction, DecisionMatrix } from "../../types/matrix";
 import {
   calculateDecisionInsights,
   type ConfidenceLevel,
@@ -6,14 +7,19 @@ import {
 } from "../../services/decisionInsights";
 import { calculateMatrixResults } from "../../services/scoring";
 import { Badge } from "../ui/Badge";
+import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { EmptyState } from "../ui/EmptyState";
+import { getAiActionReadiness } from "../../services/aiReadiness";
+import { currentTimestamp } from "../../utils/dates";
 import { CategoryBreakdown } from "./CategoryBreakdown";
 import { RankingList } from "./RankingList";
 import { WinnerCard } from "./WinnerCard";
 
 type ResultsDashboardProps = {
   matrix: DecisionMatrix;
+  onChange: (matrix: DecisionMatrix) => void;
+  onRequestAiAction: (action: AiAction) => void;
 };
 
 type BadgeTone = "default" | "green" | "amber" | "red" | "blue";
@@ -40,11 +46,57 @@ const confidenceTone: Record<ConfidenceLevel, BadgeTone> = {
 
 const formatPercentagePoints = (value: number): string => `${value.toFixed(1)} pp`;
 
-export const ResultsDashboard = ({ matrix }: ResultsDashboardProps) => {
+const priorityTone: Record<ActionPriority, BadgeTone> = {
+  low: "default",
+  medium: "amber",
+  high: "red"
+};
+
+const groupChecklistItemsByPhase = (items: ActionChecklistItem[]) =>
+  Array.from(new Set(items.map((item) => item.phase))).map((phase) => ({
+    phase,
+    items: items.filter((item) => item.phase === phase)
+  }));
+
+export const ResultsDashboard = ({
+  matrix,
+  onChange,
+  onRequestAiAction
+}: ResultsDashboardProps) => {
   const results = calculateMatrixResults(matrix);
   const winner = results.winner;
   const insights = calculateDecisionInsights(matrix, results);
   const risksWithFailures = insights.mustHaveRisks.filter((risk) => risk.failureCount > 0);
+  const checklistReadiness = getAiActionReadiness("generateActionChecklist", matrix);
+  const checklist = matrix.actionChecklist;
+  const completedChecklistItems =
+    checklist?.items.filter((item) => item.status === "done").length ?? 0;
+  const checklistItemCount = checklist?.items.length ?? 0;
+  const checklistGroups = checklist ? groupChecklistItemsByPhase(checklist.items) : [];
+
+  const updateChecklistItemStatus = (itemId: string) => {
+    if (!checklist) return;
+
+    onChange({
+      ...matrix,
+      actionChecklist: {
+        ...checklist,
+        updatedAt: currentTimestamp(),
+        items: checklist.items.map((item) =>
+          item.id === itemId
+            ? { ...item, status: item.status === "done" ? "todo" : "done" }
+            : item
+        )
+      }
+    });
+  };
+
+  const deleteChecklist = () => {
+    onChange({
+      ...matrix,
+      actionChecklist: undefined
+    });
+  };
 
   if (matrix.options.length === 0 || matrix.criteria.length === 0) {
     return (
@@ -203,6 +255,148 @@ export const ResultsDashboard = ({ matrix }: ResultsDashboardProps) => {
             )}
           </div>
         </div>
+      </Card>
+
+      <Card className="p-5">
+        {checklist ? (
+          <>
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone="blue">{checklist.type.replace(/_/g, " ")}</Badge>
+                  {checklist.generatedForOptionName ? (
+                    <Badge tone="green">{checklist.generatedForOptionName}</Badge>
+                  ) : null}
+                </div>
+                <h3 className="mt-3 text-lg font-bold text-ink-900">{checklist.title}</h3>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-500">
+                  {checklist.summary}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  icon={<ClipboardList className="h-4 w-4" />}
+                  disabled={!checklistReadiness.isReady}
+                  onClick={() => onRequestAiAction("generateActionChecklist")}
+                >
+                  Regenerate
+                </Button>
+                <Button
+                  variant="danger"
+                  icon={<Trash2 className="h-4 w-4" />}
+                  onClick={deleteChecklist}
+                >
+                  Delete checklist
+                </Button>
+              </div>
+            </div>
+            <div className="mb-4 rounded-lg bg-ink-50 p-3">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-bold text-ink-900">Progress</span>
+                <span className="font-bold text-brand-700">
+                  {completedChecklistItems} / {checklistItemCount} complete
+                </span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+                <div
+                  className="h-full rounded-full bg-brand-600"
+                  style={{
+                    width:
+                      checklistItemCount === 0
+                        ? "0%"
+                        : `${Math.round((completedChecklistItems / checklistItemCount) * 100)}%`
+                  }}
+                />
+              </div>
+            </div>
+            <div className="space-y-4">
+              {checklistGroups.map((group) => (
+                <div key={group.phase} className="rounded-lg border border-ink-100 bg-ink-50 p-4">
+                  <h4 className="font-bold text-ink-900">{group.phase}</h4>
+                  <div className="mt-3 space-y-2">
+                    {group.items.map((item) => (
+                      <label
+                        key={item.id}
+                        className="flex items-start gap-3 rounded-lg bg-white px-3 py-3 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.status === "done"}
+                          className="mt-1 h-4 w-4 rounded border-ink-300 text-brand-600"
+                          onChange={() => updateChecklistItemStatus(item.id)}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`font-bold ${
+                                item.status === "done"
+                                  ? "text-ink-500 line-through"
+                                  : "text-ink-900"
+                              }`}
+                            >
+                              {item.task}
+                            </span>
+                            <Badge tone={priorityTone[item.priority]}>
+                              {item.priority} priority
+                            </Badge>
+                          </span>
+                          <span className="mt-1 block leading-6 text-ink-500">{item.reason}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {(checklist.validationChecks.length > 0 || checklist.risksToWatch.length > 0) ? (
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div className="rounded-lg bg-brand-50 p-4">
+                  <h4 className="font-bold text-brand-700">Validation checks</h4>
+                  <ul className="mt-2 space-y-2 text-sm leading-6 text-ink-700">
+                    {checklist.validationChecks.map((check) => (
+                      <li key={check}>{check}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-lg bg-coral-50 p-4">
+                  <h4 className="font-bold text-coral-600">Risks to watch</h4>
+                  <ul className="mt-2 space-y-2 text-sm leading-6 text-ink-700">
+                    {checklist.risksToWatch.map((risk) => (
+                      <li key={risk}>{risk}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-brand-600" />
+                <h3 className="text-lg font-bold text-ink-900">
+                  Turn this decision into action
+                </h3>
+              </div>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-500">
+                Generate a practical checklist based on the winning option, risks, and weak spots.
+              </p>
+              {!checklistReadiness.isReady && checklistReadiness.reason ? (
+                <p className="mt-2 text-xs font-semibold text-ink-500">
+                  {checklistReadiness.reason}
+                </p>
+              ) : null}
+            </div>
+            <Button
+              icon={<ClipboardList className="h-4 w-4" />}
+              disabled={!checklistReadiness.isReady}
+              onClick={() => onRequestAiAction("generateActionChecklist")}
+            >
+              Generate action checklist
+            </Button>
+          </div>
+        )}
       </Card>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">

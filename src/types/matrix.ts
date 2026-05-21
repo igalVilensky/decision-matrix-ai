@@ -10,6 +10,7 @@ export type DecisionMatrix = {
   criteria: Criterion[];
   scores: Score[];
   aiSummary?: string;
+  actionChecklist?: ActionChecklist;
 };
 
 export type MatrixOption = {
@@ -43,7 +44,7 @@ export type Score = {
 
 export type AiSuggestion<T> = {
   id: string;
-  type: "criteria" | "options" | "scores" | "summary" | "quality-review";
+  type: "criteria" | "options" | "scores" | "summary" | "quality-review" | "action-checklist";
   data: T;
   createdAt: string;
 };
@@ -53,7 +54,46 @@ export type AiAction =
   | "suggestOptions"
   | "suggestScores"
   | "reviewMatrix"
-  | "generateRecommendation";
+  | "generateRecommendation"
+  | "generateActionChecklist";
+
+export type ActionChecklistType =
+  | "purchase_checklist"
+  | "trial_rollout_plan"
+  | "booking_plan"
+  | "negotiation_plan"
+  | "viewing_contract_plan"
+  | "proof_of_concept_plan"
+  | "learning_plan"
+  | "implementation_plan"
+  | "general_action_plan";
+
+export type ActionPriority = "low" | "medium" | "high";
+export type ActionStatus = "todo" | "done";
+
+export type ActionChecklistItem = {
+  id: string;
+  phase: string;
+  task: string;
+  reason: string;
+  priority: ActionPriority;
+  status: ActionStatus;
+};
+
+export type ActionChecklist = {
+  id: string;
+  type: ActionChecklistType;
+  title: string;
+  summary: string;
+  generatedForOptionId?: string;
+  generatedForOptionName?: string;
+  items: ActionChecklistItem[];
+  validationChecks: string[];
+  risksToWatch: string[];
+  createdAt: string;
+  updatedAt: string;
+  aiGenerated: boolean;
+};
 
 export type CriteriaSuggestion = {
   criteria: Array<{
@@ -95,6 +135,20 @@ export type Recommendation = {
   tradeoffs: string[];
   risks: string[];
   nextSteps: string[];
+};
+
+export type ActionChecklistSuggestion = {
+  checklistType: ActionChecklistType;
+  title: string;
+  summary: string;
+  actions: Array<{
+    phase: string;
+    task: string;
+    reason: string;
+    priority: ActionPriority;
+  }>;
+  validationChecks: string[];
+  risksToWatch: string[];
 };
 
 export type CategoryScore = {

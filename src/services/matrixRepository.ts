@@ -78,6 +78,24 @@ const cloneMatrixWithIds = (matrix: DecisionMatrix, title: string): DecisionMatr
     })
     .filter((score): score is DecisionMatrix["scores"][number] => Boolean(score));
 
+  if (matrix.actionChecklist) {
+    const generatedForOptionId = matrix.actionChecklist.generatedForOptionId
+      ? optionMap.get(matrix.actionChecklist.generatedForOptionId)
+      : undefined;
+
+    duplicate.actionChecklist = {
+      ...matrix.actionChecklist,
+      id: createId("checklist"),
+      generatedForOptionId,
+      items: matrix.actionChecklist.items.map((item) => ({
+        ...item,
+        id: createId("action")
+      })),
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+  }
+
   return duplicate;
 };
 

@@ -1,4 +1,5 @@
 import type {
+  ActionChecklistSuggestion,
   AiAction,
   CriteriaSuggestion,
   DecisionMatrix,
@@ -8,7 +9,9 @@ import type {
   Recommendation,
   ScoreSuggestion
 } from "../types/matrix";
+import type { DecisionInsights } from "./decisionInsights";
 import {
+  actionChecklistSuggestionSchema,
   criteriaSuggestionSchema,
   matrixReviewSchema,
   optionSuggestionSchema,
@@ -43,7 +46,8 @@ const callAi = async <T>(
   matrix: DecisionMatrix,
   schema: z.ZodType<T>,
   extraInstructions?: string,
-  ranking?: MatrixResults
+  ranking?: MatrixResults,
+  insights?: DecisionInsights
 ): Promise<T> => {
   const response = await fetch("/.netlify/functions/groqChat", {
     method: "POST",
@@ -54,7 +58,8 @@ const callAi = async <T>(
       action,
       matrix,
       extraInstructions,
-      ranking
+      ranking,
+      insights
     })
   });
 
@@ -125,3 +130,18 @@ export const generateRecommendation = (
   extraInstructions?: string
 ): Promise<Recommendation> =>
   callAi("generateRecommendation", matrix, recommendationSchema, extraInstructions, ranking);
+
+export const generateActionChecklist = (
+  matrix: DecisionMatrix,
+  ranking: MatrixResults,
+  insights: DecisionInsights,
+  extraInstructions?: string
+): Promise<ActionChecklistSuggestion> =>
+  callAi(
+    "generateActionChecklist",
+    matrix,
+    actionChecklistSuggestionSchema,
+    extraInstructions,
+    ranking,
+    insights
+  );
