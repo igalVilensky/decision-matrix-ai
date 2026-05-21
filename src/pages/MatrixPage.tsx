@@ -5,6 +5,7 @@ import {
   CheckSquare,
   Columns3,
   FileText,
+  LayoutGrid,
   ListChecks,
   ListPlus,
   SlidersHorizontal
@@ -15,6 +16,7 @@ import { calculateMatrixResults } from "../services/scoring";
 import { AiAssistantPanel } from "../components/matrix/AiAssistantPanel";
 import { CriteriaEditor } from "../components/matrix/CriteriaEditor";
 import { GuidedMatrixSetup } from "../components/matrix/GuidedMatrixSetup";
+import { MatrixAnalysisView } from "../components/matrix/MatrixAnalysisView";
 import { MatrixActions } from "../components/matrix/MatrixActions";
 import { OptionEditor } from "../components/matrix/OptionEditor";
 import { OverviewEditor } from "../components/matrix/OverviewEditor";
@@ -35,7 +37,15 @@ type MatrixPageProps = {
   onBackHome: () => void;
 };
 
-type TabKey = "setup" | "overview" | "options" | "criteria" | "scoring" | "results" | "ai";
+type TabKey =
+  | "setup"
+  | "overview"
+  | "options"
+  | "criteria"
+  | "scoring"
+  | "matrix"
+  | "results"
+  | "ai";
 
 type AiActionRequest = {
   id: string;
@@ -52,6 +62,7 @@ const tabs: Array<{
   { id: "options", label: "Options", icon: Columns3 },
   { id: "criteria", label: "Criteria", icon: SlidersHorizontal },
   { id: "scoring", label: "Scoring", icon: CheckSquare },
+  { id: "matrix", label: "Matrix", icon: LayoutGrid },
   { id: "results", label: "Results", icon: BarChart3 },
   { id: "ai", label: "AI", icon: Bot }
 ];
@@ -198,6 +209,7 @@ export const MatrixPage = ({
       {activeTab === "options" ? <OptionEditor matrix={matrix} onChange={onChange} /> : null}
       {activeTab === "criteria" ? <CriteriaEditor matrix={matrix} onChange={onChange} /> : null}
       {activeTab === "scoring" ? <ScoringTable matrix={matrix} onChange={onChange} /> : null}
+      {activeTab === "matrix" ? <MatrixAnalysisView matrix={matrix} /> : null}
       {activeTab === "results" ? <ResultsDashboard matrix={matrix} /> : null}
       {activeTab === "ai" ? (
         <AiAssistantPanel
