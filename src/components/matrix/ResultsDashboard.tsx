@@ -92,6 +92,9 @@ export const ResultsDashboard = ({
   };
 
   const deleteChecklist = () => {
+    const shouldDelete = window.confirm("Delete this action checklist? This cannot be undone.");
+    if (!shouldDelete) return;
+
     onChange({
       ...matrix,
       actionChecklist: undefined

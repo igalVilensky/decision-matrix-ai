@@ -222,6 +222,7 @@ export const MatrixPage = ({
           matrix={matrix}
           uid={uid}
           onChange={onChange}
+          onViewResults={() => setActiveTab("results")}
           requestedAction={aiActionRequest}
           onRequestedActionHandled={() => setAiActionRequest(undefined)}
         />

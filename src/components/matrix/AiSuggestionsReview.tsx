@@ -462,6 +462,8 @@ export const AiSuggestionsReview = ({
     };
 
     const phases = Array.from(new Set(editableSuggestion.data.actions.map((action) => action.phase)));
+    const isShortChecklist =
+      editableSuggestion.data.actions.length > 0 && editableSuggestion.data.actions.length < 3;
 
     return (
       <Card className="p-5">
@@ -484,6 +486,11 @@ export const AiSuggestionsReview = ({
             </Button>
           </div>
         </div>
+        {isShortChecklist ? (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+            Short checklist: you removed most generated actions. You can still save it.
+          </div>
+        ) : null}
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
           <div className="space-y-3 rounded-lg border border-ink-100 bg-ink-50 p-4">

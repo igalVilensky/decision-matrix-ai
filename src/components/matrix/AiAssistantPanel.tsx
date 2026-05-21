@@ -44,6 +44,7 @@ type AiAssistantPanelProps = {
   matrix: DecisionMatrix;
   uid?: string;
   onChange: (matrix: DecisionMatrix) => void;
+  onViewResults?: () => void;
   requestedAction?: AiActionRequest;
   onRequestedActionHandled?: () => void;
 };
@@ -103,12 +104,14 @@ export const AiAssistantPanel = ({
   matrix,
   uid,
   onChange,
+  onViewResults,
   requestedAction,
   onRequestedActionHandled
 }: AiAssistantPanelProps) => {
   const [extraInstructions, setExtraInstructions] = useState("");
   const [loadingAction, setLoadingAction] = useState<AiAction | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | undefined>();
   const [suggestion, setSuggestion] = useState<ReviewedSuggestion | undefined>();
   const [usageCount, setUsageCount] = useState(0);
   const [isUsageLoading, setIsUsageLoading] = useState(false);
@@ -203,16 +206,19 @@ export const AiAssistantPanel = ({
     const unavailableReason = getUnavailableReason(action);
     if (unavailableReason) {
       setError(unavailableReason);
+      setSuccessMessage(undefined);
       return;
     }
 
     if (!uid) {
       setError("AI usage tracking needs an authenticated workspace first.");
+      setSuccessMessage(undefined);
       return;
     }
 
     setLoadingAction(action);
     setError(null);
+    setSuccessMessage(undefined);
     let didSendAiRequest = false;
 
     try {
@@ -284,6 +290,7 @@ export const AiAssistantPanel = ({
 
   const acceptSuggestion = (acceptedSuggestion: ReviewedSuggestion) => {
     const suggestion = acceptedSuggestion;
+    setSuccessMessage(undefined);
 
     if (suggestion.type === "criteria") {
       onChange({
@@ -411,6 +418,7 @@ export const AiAssistantPanel = ({
         }
       });
       setSuggestion(undefined);
+      setSuccessMessage("Action checklist saved. View it in Results when you are ready.");
       return;
     }
 
@@ -444,6 +452,16 @@ export const AiAssistantPanel = ({
             {error ? (
               <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
                 {error}
+              </div>
+            ) : null}
+            {successMessage ? (
+              <div className="mt-4 flex flex-col gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 sm:flex-row sm:items-center sm:justify-between">
+                <span className="font-semibold">{successMessage}</span>
+                {onViewResults ? (
+                  <Button variant="outline" size="sm" onClick={onViewResults}>
+                    View Results
+                  </Button>
+                ) : null}
               </div>
             ) : null}
           </div>
