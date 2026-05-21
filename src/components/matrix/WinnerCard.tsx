@@ -1,14 +1,17 @@
-import { Trophy } from "lucide-react";
+import { AlertTriangle, Trophy } from "lucide-react";
 import type { OptionResult } from "../../types/matrix";
 import { Badge } from "../ui/Badge";
 import { Card } from "../ui/Card";
 
 type WinnerCardProps = {
   winner?: OptionResult;
+  saferOptionName?: string;
 };
 
-export const WinnerCard = ({ winner }: WinnerCardProps) => {
+export const WinnerCard = ({ winner, saferOptionName }: WinnerCardProps) => {
   if (!winner) return null;
+
+  const hasMustHaveFailure = winner.mustHaveFailures.length > 0;
 
   return (
     <Card className="overflow-hidden border-brand-100 bg-white">
@@ -37,13 +40,34 @@ export const WinnerCard = ({ winner }: WinnerCardProps) => {
           <div className="text-sm text-ink-500">weighted points</div>
         </div>
         <div className="flex flex-wrap content-start gap-2">
-          {winner.mustHaveFailures.length > 0 ? (
+          {hasMustHaveFailure ? (
             <Badge tone="red">{winner.mustHaveFailures.length} must-have gaps</Badge>
           ) : (
             <Badge tone="green">No must-have gaps</Badge>
           )}
         </div>
       </div>
+      {hasMustHaveFailure ? (
+        <div className="border-t border-red-100 bg-red-50 px-5 py-4">
+          <div className="flex gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
+            <div>
+              <div className="font-bold text-red-700">
+                This option has the highest score but fails a must-have criterion.
+              </div>
+              {saferOptionName ? (
+                <p className="mt-1 text-sm leading-6 text-ink-700">
+                  Review {saferOptionName} as a high-ranking option with no must-have failures.
+                </p>
+              ) : (
+                <p className="mt-1 text-sm leading-6 text-ink-700">
+                  Review the failed must-have criteria before treating this as the final decision.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </Card>
   );
 };

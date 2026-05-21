@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, FilePlus2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, FilePlus2, Plus, Trash2 } from "lucide-react";
 import type { Criterion, DecisionMatrix, MatrixOption } from "../../types/matrix";
 import { currentTimestamp } from "../../utils/dates";
 import { createId } from "../../utils/ids";
@@ -227,10 +227,11 @@ type CreateMatrixFormProps = {
   onCreate: (matrix: DecisionMatrix) => void;
 };
 
-type CreateStep = 0 | 1 | 2 | 3;
+type CreateStep = 0 | 1 | 2 | 3 | 4;
 type StartMode = "guided" | "template";
 
-const stepLabels = ["Decision", "Options", "Priorities", "Start"];
+const stepLabels = ["Decision", "Category", "Options", "Priorities", "Start"];
+const optionPlaceholders = ["Lisbon", "Barcelona", "Athens"];
 
 const createTitleFromDescription = (description: string, comparisonType: string): string => {
   const compactDescription = description.trim().replace(/\s+/g, " ");
@@ -249,6 +250,7 @@ export const CreateMatrixForm = ({ onCreate }: CreateMatrixFormProps) => {
   const [step, setStep] = useState<CreateStep>(0);
   const [decisionDescription, setDecisionDescription] = useState("");
   const [comparisonType, setComparisonType] = useState("");
+  const [initialOptions, setInitialOptions] = useState(["", "", ""]);
   const [priorities, setPriorities] = useState("");
   const [startMode, setStartMode] = useState<StartMode>("guided");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(templates[0]?.id ?? "");
@@ -261,11 +263,12 @@ export const CreateMatrixForm = ({ onCreate }: CreateMatrixFormProps) => {
     (step === 0 && decisionDescription.trim().length > 0) ||
     (step === 1 && comparisonType.trim().length > 0) ||
     step === 2 ||
-    step === 3;
+    step === 3 ||
+    step === 4;
 
   const goNext = () => {
-    if (!canContinue || step === 3) return;
-    setStep((currentStep) => Math.min(currentStep + 1, 3) as CreateStep);
+    if (!canContinue || step === 4) return;
+    setStep((currentStep) => Math.min(currentStep + 1, 4) as CreateStep);
   };
 
   const goBack = () => {
@@ -280,7 +283,16 @@ export const CreateMatrixForm = ({ onCreate }: CreateMatrixFormProps) => {
         ...option,
         id: createId("option"),
         notes: ""
-      })) ?? [];
+      })) ??
+      initialOptions
+        .map((option) => option.trim())
+        .filter(Boolean)
+        .map((name) => ({
+          id: createId("option"),
+          name,
+          description: "",
+          notes: ""
+        }));
     const criteria =
       template?.criteria.map((criterion) => ({
         ...criterion,
@@ -336,9 +348,9 @@ export const CreateMatrixForm = ({ onCreate }: CreateMatrixFormProps) => {
     if (step === 1) {
       return (
         <Input
-          label="What kind of options are you comparing?"
-          placeholder="travel destinations, laptops, job offers, software tools"
-          helperText="This becomes the category for the matrix and helps AI suggest useful options or criteria."
+          label="What type of things are you comparing?"
+          placeholder="Examples: travel destinations, laptops, job offers, software tools"
+          helperText="This is the category, not the actual options. You will add the actual choices in the next step."
           value={comparisonType}
           onChange={(event) => setComparisonType(event.target.value)}
         />
@@ -346,6 +358,62 @@ export const CreateMatrixForm = ({ onCreate }: CreateMatrixFormProps) => {
     }
 
     if (step === 2) {
+      const updateInitialOption = (index: number, value: string) => {
+        setInitialOptions((currentOptions) =>
+          currentOptions.map((option, optionIndex) =>
+            optionIndex === index ? value : option
+          )
+        );
+      };
+
+      const addInitialOption = () => {
+        setInitialOptions((currentOptions) => [...currentOptions, ""]);
+      };
+
+      const removeInitialOption = (index: number) => {
+        setInitialOptions((currentOptions) =>
+          currentOptions.filter((_, optionIndex) => optionIndex !== index)
+        );
+      };
+
+      return (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-bold text-ink-900">Add any options you already have</h3>
+            <p className="mt-1 text-sm leading-6 text-ink-500">
+              These are the choices you want to compare. You can skip this and ask AI to suggest
+              options later.
+            </p>
+          </div>
+          <div className="space-y-3">
+            {initialOptions.map((option, index) => (
+              <div key={index} className="flex items-start gap-2">
+                <Input
+                  label={index === 0 ? "Option names" : undefined}
+                  placeholder={optionPlaceholders[index] ?? "Another option"}
+                  value={option}
+                  onChange={(event) => updateInitialOption(index, event.target.value)}
+                />
+                <Button
+                  className={index === 0 ? "mt-7" : ""}
+                  variant="ghost"
+                  size="icon"
+                  icon={<Trash2 className="h-4 w-4" />}
+                  onClick={() => removeInitialOption(index)}
+                >
+                  Remove option field
+                </Button>
+              </div>
+            ))}
+          </div>
+          <Button variant="outline" icon={<Plus className="h-4 w-4" />} onClick={addInitialOption}>
+            Add another option
+          </Button>
+        </div>
+      );
+    }
+
+    if (step === 3) {
       return (
         <Textarea
           label="What matters most?"
@@ -467,7 +535,7 @@ export const CreateMatrixForm = ({ onCreate }: CreateMatrixFormProps) => {
               Back
             </Button>
           ) : null}
-          {step < 3 ? (
+          {step < 4 ? (
             <Button
               icon={<ArrowRight className="h-4 w-4" />}
               disabled={!canContinue}
