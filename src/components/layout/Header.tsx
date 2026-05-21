@@ -5,7 +5,7 @@ import { Badge } from "../ui/Badge";
 type HeaderProps = {
   onHome: () => void;
   onNewMatrix: () => void;
-  saveStatus?: "idle" | "saving" | "saved";
+  saveStatus?: "idle" | "saving" | "saved" | "error";
 };
 
 export const Header = ({ onHome, onNewMatrix, saveStatus = "idle" }: HeaderProps) => (
@@ -25,8 +25,12 @@ export const Header = ({ onHome, onNewMatrix, saveStatus = "idle" }: HeaderProps
       </button>
       <div className="flex items-center gap-3">
         {saveStatus !== "idle" ? (
-          <Badge tone={saveStatus === "saved" ? "green" : "default"}>
-            {saveStatus === "saved" ? "Saved" : "Saving"}
+          <Badge
+            tone={
+              saveStatus === "saved" ? "green" : saveStatus === "error" ? "red" : "default"
+            }
+          >
+            {saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Save failed" : "Saving"}
           </Badge>
         ) : null}
         <Button icon={<Plus className="h-4 w-4" />} onClick={onNewMatrix}>

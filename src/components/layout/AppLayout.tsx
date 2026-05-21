@@ -7,7 +7,7 @@ type AppLayoutProps = {
   children: ReactNode;
   matrices: DecisionMatrix[];
   activeMatrixId?: string;
-  saveStatus?: "idle" | "saving" | "saved";
+  saveStatus?: "idle" | "saving" | "saved" | "error";
   onHome: () => void;
   onNewMatrix: () => void;
   onOpenMatrix: (id: string) => void;

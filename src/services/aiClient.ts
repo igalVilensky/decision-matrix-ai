@@ -8,6 +8,14 @@ import type {
   Recommendation,
   ScoreSuggestion
 } from "../types/matrix";
+import {
+  criteriaSuggestionSchema,
+  matrixReviewSchema,
+  optionSuggestionSchema,
+  recommendationSchema,
+  scoreSuggestionSchema
+} from "../schemas/matrixSchemas";
+import type { z } from "zod";
 
 type AiSuccessResponse<T> = {
   success: true;
@@ -22,9 +30,18 @@ type AiErrorResponse = {
 
 type AiResponse<T> = AiSuccessResponse<T> | AiErrorResponse;
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const getErrorMessage = (payload: unknown, fallback: string): string => {
+  if (!isRecord(payload)) return fallback;
+  return typeof payload.error === "string" ? payload.error : fallback;
+};
+
 const callAi = async <T>(
   action: AiAction,
   matrix: DecisionMatrix,
+  schema: z.ZodType<T>,
   extraInstructions?: string,
   ranking?: MatrixResults
 ): Promise<T> => {
@@ -41,39 +58,70 @@ const callAi = async <T>(
     })
   });
 
-  const payload = (await response.json()) as AiResponse<T>;
+  let payload: unknown;
 
-  if (!response.ok || !payload.success) {
-    const error = payload.success ? "The AI request failed." : payload.error;
-    throw new Error(error);
+  try {
+    payload = (await response.json()) as unknown;
+  } catch {
+    throw new Error("The AI service returned an invalid response.");
   }
 
-  return payload.data;
+  if (!response.ok) {
+    throw new Error(getErrorMessage(payload, "The AI request failed."));
+  }
+
+  if (!isRecord(payload)) {
+    throw new Error("The AI service returned an invalid response.");
+  }
+
+  if (payload.success === false) {
+    throw new Error(getErrorMessage(payload, "The AI request failed."));
+  }
+
+  if (payload.success !== true) {
+    throw new Error("The AI service returned an invalid response.");
+  }
+
+  if (!("data" in payload)) {
+    throw new Error("The AI service returned no usable data.");
+  }
+
+  const parsedData = schema.safeParse(payload.data);
+
+  if (!parsedData.success) {
+    throw new Error("The AI service returned data in an unexpected format.");
+  }
+
+  return parsedData.data;
 };
 
 export const generateCriteria = (
   matrix: DecisionMatrix,
   extraInstructions?: string
-): Promise<CriteriaSuggestion> => callAi("generateCriteria", matrix, extraInstructions);
+): Promise<CriteriaSuggestion> =>
+  callAi("generateCriteria", matrix, criteriaSuggestionSchema, extraInstructions);
 
 export const suggestOptions = (
   matrix: DecisionMatrix,
   extraInstructions?: string
-): Promise<OptionSuggestion> => callAi("suggestOptions", matrix, extraInstructions);
+): Promise<OptionSuggestion> =>
+  callAi("suggestOptions", matrix, optionSuggestionSchema, extraInstructions);
 
 export const suggestScores = (
   matrix: DecisionMatrix,
   extraInstructions?: string
-): Promise<ScoreSuggestion> => callAi("suggestScores", matrix, extraInstructions);
+): Promise<ScoreSuggestion> =>
+  callAi("suggestScores", matrix, scoreSuggestionSchema, extraInstructions);
 
 export const reviewMatrix = (
   matrix: DecisionMatrix,
   extraInstructions?: string
-): Promise<MatrixReview> => callAi("reviewMatrix", matrix, extraInstructions);
+): Promise<MatrixReview> =>
+  callAi("reviewMatrix", matrix, matrixReviewSchema, extraInstructions);
 
 export const generateRecommendation = (
   matrix: DecisionMatrix,
   ranking: MatrixResults,
   extraInstructions?: string
 ): Promise<Recommendation> =>
-  callAi("generateRecommendation", matrix, extraInstructions, ranking);
+  callAi("generateRecommendation", matrix, recommendationSchema, extraInstructions, ranking);

@@ -43,7 +43,7 @@ export const HomePage = ({
         <div>
           <h2 className="text-2xl font-bold text-ink-900">Saved matrices</h2>
           <p className="mt-1 text-sm text-ink-500">
-            Stored locally in this browser for the MVP.
+            Synced to your anonymous Firebase workspace.
           </p>
         </div>
       </div>

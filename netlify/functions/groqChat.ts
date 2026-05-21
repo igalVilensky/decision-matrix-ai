@@ -1,4 +1,5 @@
 import type { Handler, HandlerEvent } from "@netlify/functions";
+import { aiResponseDataSchemas } from "../../src/schemas/matrixSchemas";
 
 type AiAction =
   | "generateCriteria"
@@ -207,6 +208,27 @@ const parseJsonContent = (content: string): unknown => {
   }
 };
 
+const validateAiData = (action: AiAction, data: unknown) => {
+  const validation = aiResponseDataSchemas[action].safeParse(data);
+
+  if (validation.success) {
+    return { success: true as const, data: validation.data };
+  }
+
+  const details =
+    process.env.NODE_ENV === "development"
+      ? validation.error.issues.slice(0, 5).map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message
+        }))
+      : undefined;
+
+  return {
+    success: false as const,
+    details
+  };
+};
+
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return response(405, {
@@ -272,10 +294,29 @@ export const handler: Handler = async (event) => {
       });
     }
 
+    let parsedContent: unknown;
+    try {
+      parsedContent = parseJsonContent(content);
+    } catch {
+      return response(502, {
+        success: false,
+        error: "AI returned an unexpected response format."
+      });
+    }
+    const validated = validateAiData(request.action, parsedContent);
+
+    if (!validated.success) {
+      return response(502, {
+        success: false,
+        error: "AI returned an unexpected response format.",
+        ...(validated.details ? { details: validated.details } : {})
+      });
+    }
+
     return response(200, {
       success: true,
       action: request.action,
-      data: parseJsonContent(content)
+      data: validated.data
     });
   } catch (error) {
     return response(500, {

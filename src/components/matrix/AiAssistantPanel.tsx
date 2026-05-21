@@ -87,8 +87,8 @@ export const AiAssistantPanel = ({ matrix, onChange }: AiAssistantPanelProps) =>
     }
   };
 
-  const acceptSuggestion = () => {
-    if (!suggestion) return;
+  const acceptSuggestion = (acceptedSuggestion: ReviewedSuggestion) => {
+    const suggestion = acceptedSuggestion;
 
     if (suggestion.type === "criteria") {
       onChange({

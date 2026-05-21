@@ -17,6 +17,7 @@ export type MatrixOption = {
   name: string;
   description?: string;
   notes?: string;
+  aiGenerated?: boolean;
 };
 
 export type Criterion = {

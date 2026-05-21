@@ -12,6 +12,7 @@ import type { DecisionMatrix } from "../types/matrix";
 import { calculateMatrixResults } from "../services/scoring";
 import { AiAssistantPanel } from "../components/matrix/AiAssistantPanel";
 import { CriteriaEditor } from "../components/matrix/CriteriaEditor";
+import { MatrixActions } from "../components/matrix/MatrixActions";
 import { OptionEditor } from "../components/matrix/OptionEditor";
 import { OverviewEditor } from "../components/matrix/OverviewEditor";
 import { ResultsDashboard } from "../components/matrix/ResultsDashboard";
@@ -23,7 +24,9 @@ import { EmptyState } from "../components/ui/EmptyState";
 
 type MatrixPageProps = {
   matrix?: DecisionMatrix;
+  matrices: DecisionMatrix[];
   onChange: (matrix: DecisionMatrix) => void;
+  onImportMatrix: (matrix: DecisionMatrix) => Promise<void> | void;
   onBackHome: () => void;
 };
 
@@ -42,7 +45,13 @@ const tabs: Array<{
   { id: "ai", label: "AI Assistant", icon: Bot }
 ];
 
-export const MatrixPage = ({ matrix, onChange, onBackHome }: MatrixPageProps) => {
+export const MatrixPage = ({
+  matrix,
+  matrices,
+  onChange,
+  onImportMatrix,
+  onBackHome
+}: MatrixPageProps) => {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const results = useMemo(() => (matrix ? calculateMatrixResults(matrix) : undefined), [matrix]);
 
@@ -51,7 +60,7 @@ export const MatrixPage = ({ matrix, onChange, onBackHome }: MatrixPageProps) =>
       <div className="mx-auto max-w-4xl">
         <EmptyState
           title="Matrix not found"
-          description="The matrix may have been deleted from local storage."
+          description="The matrix may have been deleted or may not exist in this Firebase workspace."
           action={
             <Button onClick={onBackHome}>
               Back home
@@ -94,6 +103,13 @@ export const MatrixPage = ({ matrix, onChange, onBackHome }: MatrixPageProps) =>
               <div className="text-xs font-semibold text-brand-700">Top fit</div>
             </div>
           </div>
+        </div>
+        <div className="mt-5 border-t border-ink-100 pt-4">
+          <MatrixActions
+            matrix={matrix}
+            matrices={matrices}
+            onImportMatrix={onImportMatrix}
+          />
         </div>
       </Card>
 
