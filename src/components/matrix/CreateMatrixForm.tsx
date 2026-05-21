@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react";
-import { Check, FilePlus2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, FilePlus2 } from "lucide-react";
 import type { Criterion, DecisionMatrix, MatrixOption } from "../../types/matrix";
 import { currentTimestamp } from "../../utils/dates";
 import { createId } from "../../utils/ids";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
-import { Card } from "../ui/Card";
 import { Input } from "../ui/Input";
 import { Textarea } from "../ui/Textarea";
 
@@ -228,30 +227,54 @@ type CreateMatrixFormProps = {
   onCreate: (matrix: DecisionMatrix) => void;
 };
 
+type CreateStep = 0 | 1 | 2 | 3;
+type StartMode = "guided" | "template";
+
+const stepLabels = ["Decision", "Options", "Priorities", "Start"];
+
+const createTitleFromDescription = (description: string, comparisonType: string): string => {
+  const compactDescription = description.trim().replace(/\s+/g, " ");
+  const firstSentence = compactDescription.split(/[.!?]/)[0]?.trim() ?? "";
+
+  if (firstSentence) {
+    const title = firstSentence.length > 78 ? `${firstSentence.slice(0, 75).trim()}...` : firstSentence;
+    return title.charAt(0).toUpperCase() + title.slice(1);
+  }
+
+  const compactComparison = comparisonType.trim().replace(/\s+/g, " ");
+  return compactComparison ? `${compactComparison} decision` : "Untitled decision";
+};
+
 export const CreateMatrixForm = ({ onCreate }: CreateMatrixFormProps) => {
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("blank");
+  const [step, setStep] = useState<CreateStep>(0);
+  const [decisionDescription, setDecisionDescription] = useState("");
+  const [comparisonType, setComparisonType] = useState("");
+  const [priorities, setPriorities] = useState("");
+  const [startMode, setStartMode] = useState<StartMode>("guided");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(templates[0]?.id ?? "");
   const selectedTemplate = useMemo(
     () => templates.find((template) => template.id === selectedTemplateId),
     [selectedTemplateId]
   );
-  const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("");
-  const [goal, setGoal] = useState("");
-  const [constraints, setConstraints] = useState("");
 
-  const applyTemplate = (templateId: string) => {
-    setSelectedTemplateId(templateId);
-    const template = templates.find((item) => item.id === templateId);
-    if (!template) return;
-    setTitle(template.name);
-    setCategory(template.category);
-    setGoal(template.goal);
-    setConstraints(template.constraints);
+  const canContinue =
+    (step === 0 && decisionDescription.trim().length > 0) ||
+    (step === 1 && comparisonType.trim().length > 0) ||
+    step === 2 ||
+    step === 3;
+
+  const goNext = () => {
+    if (!canContinue || step === 3) return;
+    setStep((currentStep) => Math.min(currentStep + 1, 3) as CreateStep);
   };
 
-  const createMatrix = (withTemplate: boolean) => {
+  const goBack = () => {
+    setStep((currentStep) => Math.max(currentStep - 1, 0) as CreateStep);
+  };
+
+  const createMatrix = () => {
     const timestamp = currentTimestamp();
-    const template = withTemplate ? selectedTemplate : undefined;
+    const template = startMode === "template" ? selectedTemplate : undefined;
     const options =
       template?.options.map((option) => ({
         ...option,
@@ -267,10 +290,10 @@ export const CreateMatrixForm = ({ onCreate }: CreateMatrixFormProps) => {
 
     onCreate({
       id: createId("matrix"),
-      title: title.trim() || template?.name || "Untitled decision",
-      category: category.trim() || template?.category || "General",
-      goal: goal.trim(),
-      constraints: constraints.trim(),
+      title: createTitleFromDescription(decisionDescription, comparisonType),
+      category: comparisonType.trim() || template?.category || "General",
+      goal: decisionDescription.trim() || template?.goal || "",
+      constraints: priorities.trim() || template?.constraints || "",
       createdAt: timestamp,
       updatedAt: timestamp,
       options,
@@ -279,93 +302,186 @@ export const CreateMatrixForm = ({ onCreate }: CreateMatrixFormProps) => {
     });
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2">
-        <Input
-          label="Decision title"
-          placeholder="Which laptop should I buy?"
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-        />
-        <Input
-          label="What are you comparing?"
-          placeholder="Laptops, apartments, vendors, cities..."
-          value={category}
-          onChange={(event) => setCategory(event.target.value)}
-        />
-        <Textarea
-          label="Goal/context"
-          placeholder="Describe the decision, who it affects, and what a good outcome looks like."
-          value={goal}
-          onChange={(event) => setGoal(event.target.value)}
-        />
-        <Textarea
-          label="Constraints or priorities"
-          placeholder="Budget, deadlines, must-haves, preferences, unknowns..."
-          value={constraints}
-          onChange={(event) => setConstraints(event.target.value)}
-        />
-      </div>
-
-      <div>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-ink-500">
-            Start from a template
-          </h3>
-          <Badge>{selectedTemplate ? selectedTemplate.name : "Blank matrix"}</Badge>
+  const renderStep = () => {
+    if (step === 0) {
+      return (
+        <div className="space-y-4">
+          <Textarea
+            label="What decision are you trying to make?"
+            placeholder="Example: I need to choose a laptop for software development, travel, and photo editing without overspending."
+            helperText="Write this naturally. The app will use it to guide setup and AI suggestions."
+            className="min-h-40"
+            value={decisionDescription}
+            onChange={(event) => setDecisionDescription(event.target.value)}
+          />
+          <div className="flex flex-wrap gap-2">
+            {[
+              "Choose a remote work city",
+              "Pick between job offers",
+              "Select a CRM for a small team"
+            ].map((example) => (
+              <button
+                key={example}
+                className="rounded-full border border-ink-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink-600 transition hover:border-brand-500 hover:text-brand-700"
+                onClick={() => setDecisionDescription(example)}
+              >
+                {example}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      );
+    }
+
+    if (step === 1) {
+      return (
+        <Input
+          label="What kind of options are you comparing?"
+          placeholder="travel destinations, laptops, job offers, software tools"
+          helperText="This becomes the category for the matrix and helps AI suggest useful options or criteria."
+          value={comparisonType}
+          onChange={(event) => setComparisonType(event.target.value)}
+        />
+      );
+    }
+
+    if (step === 2) {
+      return (
+        <Textarea
+          label="What matters most?"
+          placeholder="Budget, beginner friendliness, privacy, timeline, must-haves, risks, people affected..."
+          helperText="Optional, but helpful. You can edit priorities later."
+          className="min-h-40"
+          value={priorities}
+          onChange={(event) => setPriorities(event.target.value)}
+        />
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
           <button
             className={`rounded-lg border p-4 text-left transition hover:border-brand-500 ${
-              selectedTemplateId === "blank"
+              startMode === "guided"
                 ? "border-brand-500 bg-brand-50"
                 : "border-ink-200 bg-white"
             }`}
-            onClick={() => setSelectedTemplateId("blank")}
+            onClick={() => setStartMode("guided")}
           >
             <FilePlus2 className="mb-3 h-5 w-5 text-brand-600" />
-            <div className="font-bold text-ink-900">Blank matrix</div>
-            <p className="mt-1 text-sm text-ink-500">Start clean and add your own structure.</p>
+            <div className="font-bold text-ink-900">Start guided setup</div>
+            <p className="mt-1 text-sm leading-6 text-ink-500">
+              Start clean and let the app guide options, criteria, scores, and review.
+            </p>
           </button>
-          {templates.map((template) => (
-            <button
-              key={template.id}
-              className={`rounded-lg border p-4 text-left transition hover:border-brand-500 ${
-                selectedTemplateId === template.id
-                  ? "border-brand-500 bg-brand-50"
-                  : "border-ink-200 bg-white"
-              }`}
-              onClick={() => applyTemplate(template.id)}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-bold text-ink-900">{template.name}</div>
-                  <p className="mt-1 text-sm text-ink-500">{template.category}</p>
-                </div>
-                {selectedTemplateId === template.id ? (
-                  <Check className="h-5 w-5 text-brand-600" />
-                ) : null}
-              </div>
-            </button>
-          ))}
+          <button
+            className={`rounded-lg border p-4 text-left transition hover:border-brand-500 ${
+              startMode === "template"
+                ? "border-brand-500 bg-brand-50"
+                : "border-ink-200 bg-white"
+            }`}
+            onClick={() => setStartMode("template")}
+          >
+            <Check className="mb-3 h-5 w-5 text-brand-600" />
+            <div className="font-bold text-ink-900">Start from template</div>
+            <p className="mt-1 text-sm leading-6 text-ink-500">
+              Preload practical options and criteria, then edit them for your decision.
+            </p>
+          </button>
         </div>
+
+        {startMode === "template" ? (
+          <div>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-ink-500">
+                Choose a template
+              </h3>
+              <Badge>{selectedTemplate?.name ?? "Template"}</Badge>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {templates.map((template) => (
+                <button
+                  key={template.id}
+                  className={`rounded-lg border p-4 text-left transition hover:border-brand-500 ${
+                    selectedTemplateId === template.id
+                      ? "border-brand-500 bg-brand-50"
+                      : "border-ink-200 bg-white"
+                  }`}
+                  onClick={() => setSelectedTemplateId(template.id)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-bold text-ink-900">{template.name}</div>
+                      <p className="mt-1 text-sm text-ink-500">{template.category}</p>
+                    </div>
+                    {selectedTemplateId === template.id ? (
+                      <Check className="h-5 w-5 text-brand-600" />
+                    ) : null}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap gap-2">
+        {stepLabels.map((label, index) => {
+          const isActive = step === index;
+          const isComplete = step > index;
+
+          return (
+            <span
+              key={label}
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${
+                isActive
+                  ? "bg-ink-900 text-white"
+                  : isComplete
+                    ? "bg-brand-100 text-brand-700"
+                    : "bg-ink-100 text-ink-500"
+              }`}
+            >
+              {isComplete ? <Check className="h-3.5 w-3.5" /> : index + 1}
+              {label}
+            </span>
+          );
+        })}
       </div>
 
-      <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between" tone="soft">
-        <p className="text-sm leading-6 text-ink-600">
-          You can use AI after creation to generate more criteria, suggest options, or draft
-          scores for review.
+      <div className="rounded-lg border border-ink-100 bg-ink-50/70 p-5">
+        {renderStep()}
+      </div>
+
+      <div className="flex flex-col gap-3 border-t border-ink-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm leading-6 text-ink-500">
+          AI can help draft suggestions later, and you can edit everything before accepting it.
         </p>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => createMatrix(false)}>
-            Create blank matrix
-          </Button>
-          <Button onClick={() => createMatrix(true)}>
-            {selectedTemplate ? "Create from template" : "Create matrix"}
-          </Button>
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          {step > 0 ? (
+            <Button variant="outline" icon={<ArrowLeft className="h-4 w-4" />} onClick={goBack}>
+              Back
+            </Button>
+          ) : null}
+          {step < 3 ? (
+            <Button
+              icon={<ArrowRight className="h-4 w-4" />}
+              disabled={!canContinue}
+              onClick={goNext}
+            >
+              Continue
+            </Button>
+          ) : (
+            <Button onClick={createMatrix}>
+              Create decision matrix
+            </Button>
+          )}
         </div>
-      </Card>
+      </div>
     </div>
   );
 };

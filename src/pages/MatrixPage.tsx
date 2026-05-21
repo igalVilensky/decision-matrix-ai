@@ -1,17 +1,20 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
   Bot,
   CheckSquare,
   Columns3,
   FileText,
+  ListChecks,
   ListPlus,
   SlidersHorizontal
 } from "lucide-react";
-import type { DecisionMatrix } from "../types/matrix";
+import type { AiAction, DecisionMatrix } from "../types/matrix";
+import { getAiActionReadiness } from "../services/aiReadiness";
 import { calculateMatrixResults } from "../services/scoring";
 import { AiAssistantPanel } from "../components/matrix/AiAssistantPanel";
 import { CriteriaEditor } from "../components/matrix/CriteriaEditor";
+import { GuidedMatrixSetup } from "../components/matrix/GuidedMatrixSetup";
 import { MatrixActions } from "../components/matrix/MatrixActions";
 import { OptionEditor } from "../components/matrix/OptionEditor";
 import { OverviewEditor } from "../components/matrix/OverviewEditor";
@@ -21,39 +24,54 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { EmptyState } from "../components/ui/EmptyState";
+import { createId } from "../utils/ids";
 
 type MatrixPageProps = {
   matrix?: DecisionMatrix;
   matrices: DecisionMatrix[];
+  uid?: string;
   onChange: (matrix: DecisionMatrix) => void;
   onImportMatrix: (matrix: DecisionMatrix) => Promise<void> | void;
   onBackHome: () => void;
 };
 
-type TabKey = "overview" | "options" | "criteria" | "scoring" | "results" | "ai";
+type TabKey = "setup" | "overview" | "options" | "criteria" | "scoring" | "results" | "ai";
+
+type AiActionRequest = {
+  id: string;
+  action: AiAction;
+};
 
 const tabs: Array<{
   id: TabKey;
   label: string;
   icon: typeof FileText;
 }> = [
+  { id: "setup", label: "Setup", icon: ListChecks },
   { id: "overview", label: "Overview", icon: FileText },
   { id: "options", label: "Options", icon: Columns3 },
   { id: "criteria", label: "Criteria", icon: SlidersHorizontal },
   { id: "scoring", label: "Scoring", icon: CheckSquare },
   { id: "results", label: "Results", icon: BarChart3 },
-  { id: "ai", label: "AI Assistant", icon: Bot }
+  { id: "ai", label: "AI", icon: Bot }
 ];
 
 export const MatrixPage = ({
   matrix,
   matrices,
+  uid,
   onChange,
   onImportMatrix,
   onBackHome
 }: MatrixPageProps) => {
-  const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [activeTab, setActiveTab] = useState<TabKey>("setup");
+  const [aiActionRequest, setAiActionRequest] = useState<AiActionRequest | undefined>();
   const results = useMemo(() => (matrix ? calculateMatrixResults(matrix) : undefined), [matrix]);
+
+  useEffect(() => {
+    setActiveTab("setup");
+    setAiActionRequest(undefined);
+  }, [matrix?.id]);
 
   if (!matrix) {
     return (
@@ -71,6 +89,16 @@ export const MatrixPage = ({
     );
   }
 
+  const hasAnyMatrixContent =
+    matrix.options.length > 0 || matrix.criteria.length > 0 || matrix.scores.length > 0;
+  const expectedScoreCount = matrix.options.length * matrix.criteria.length;
+  const hasScores = matrix.scores.length > 0;
+  const recommendationReadiness = getAiActionReadiness("generateRecommendation", matrix);
+  const openAiAction = (action: AiAction) => {
+    setAiActionRequest({ id: createId("ai-action"), action });
+    setActiveTab("ai");
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-5">
       <Card className="p-5">
@@ -87,30 +115,49 @@ export const MatrixPage = ({
               {matrix.goal || "Add context so the decision has a clear objective."}
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-3 sm:min-w-[420px]">
-            <div className="rounded-lg bg-ink-50 p-3">
-              <div className="text-2xl font-bold text-ink-900">{matrix.options.length}</div>
-              <div className="text-xs font-semibold text-ink-500">Options</div>
-            </div>
-            <div className="rounded-lg bg-ink-50 p-3">
-              <div className="text-2xl font-bold text-ink-900">{matrix.criteria.length}</div>
-              <div className="text-xs font-semibold text-ink-500">Criteria</div>
-            </div>
-            <div className="rounded-lg bg-brand-50 p-3">
-              <div className="truncate text-2xl font-bold text-brand-700">
-                {results?.winner ? Math.round(results.winner.percentageFit) : 0}%
+          {hasAnyMatrixContent ? (
+            <div className="grid grid-cols-3 gap-3 sm:min-w-[420px]">
+              <div className="rounded-lg bg-ink-50 p-3">
+                <div className="text-2xl font-bold text-ink-900">{matrix.options.length}</div>
+                <div className="text-xs font-semibold text-ink-500">Options</div>
               </div>
-              <div className="text-xs font-semibold text-brand-700">Top fit</div>
+              <div className="rounded-lg bg-ink-50 p-3">
+                <div className="text-2xl font-bold text-ink-900">{matrix.criteria.length}</div>
+                <div className="text-xs font-semibold text-ink-500">Criteria</div>
+              </div>
+              <div className="rounded-lg bg-brand-50 p-3">
+                <div className="truncate text-2xl font-bold text-brand-700">
+                  {hasScores && results?.winner
+                    ? `${Math.round(results.winner.percentageFit)}%`
+                    : `${matrix.scores.length}/${expectedScoreCount}`}
+                </div>
+                <div className="text-xs font-semibold text-brand-700">
+                  {hasScores ? "Top fit" : "Scores"}
+                </div>
+              </div>
             </div>
+          ) : (
+            <div className="rounded-lg border border-brand-100 bg-brand-50 p-4 sm:min-w-[360px]">
+              <div className="text-sm font-bold text-brand-700">Next: add options</div>
+              <p className="mt-1 text-sm leading-6 text-ink-600">
+                Start by adding the choices you want to compare. AI can help draft suggestions,
+                but you can edit everything before accepting.
+              </p>
+            </div>
+          )}
+        </div>
+        <details className="mt-5 border-t border-ink-100 pt-4">
+          <summary className="cursor-pointer text-sm font-bold text-ink-600 transition hover:text-ink-900">
+            Import / export JSON
+          </summary>
+          <div className="mt-3">
+            <MatrixActions
+              matrix={matrix}
+              matrices={matrices}
+              onImportMatrix={onImportMatrix}
+            />
           </div>
-        </div>
-        <div className="mt-5 border-t border-ink-100 pt-4">
-          <MatrixActions
-            matrix={matrix}
-            matrices={matrices}
-            onImportMatrix={onImportMatrix}
-          />
-        </div>
+        </details>
       </Card>
 
       <div className="overflow-x-auto rounded-xl border border-ink-200 bg-white p-2 shadow-sm matrix-scrollbar">
@@ -136,23 +183,45 @@ export const MatrixPage = ({
         </div>
       </div>
 
+      {activeTab === "setup" ? (
+        <GuidedMatrixSetup
+          matrix={matrix}
+          onChange={onChange}
+          onOpenOptions={() => setActiveTab("options")}
+          onOpenCriteria={() => setActiveTab("criteria")}
+          onOpenScoring={() => setActiveTab("scoring")}
+          onOpenResults={() => setActiveTab("results")}
+          onRequestAiAction={openAiAction}
+        />
+      ) : null}
       {activeTab === "overview" ? <OverviewEditor matrix={matrix} onChange={onChange} /> : null}
       {activeTab === "options" ? <OptionEditor matrix={matrix} onChange={onChange} /> : null}
       {activeTab === "criteria" ? <CriteriaEditor matrix={matrix} onChange={onChange} /> : null}
       {activeTab === "scoring" ? <ScoringTable matrix={matrix} onChange={onChange} /> : null}
       {activeTab === "results" ? <ResultsDashboard matrix={matrix} /> : null}
-      {activeTab === "ai" ? <AiAssistantPanel matrix={matrix} onChange={onChange} /> : null}
+      {activeTab === "ai" ? (
+        <AiAssistantPanel
+          matrix={matrix}
+          uid={uid}
+          onChange={onChange}
+          requestedAction={aiActionRequest}
+          onRequestedActionHandled={() => setAiActionRequest(undefined)}
+        />
+      ) : null}
 
-      {activeTab !== "ai" && matrix.options.length > 0 && matrix.criteria.length > 0 ? (
+      {activeTab !== "ai" && matrix.options.length >= 2 && matrix.criteria.length >= 3 ? (
         <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between" tone="soft">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-brand-600 shadow-sm">
               <ListPlus className="h-5 w-5" />
             </span>
             <div>
-              <div className="font-bold text-ink-900">Need another perspective?</div>
+              <div className="font-bold text-ink-900">
+                {recommendationReadiness.isReady ? "Ready for a second pass?" : "Ready to draft scores?"}
+              </div>
               <div className="text-sm text-ink-500">
-                Ask AI to review criteria, draft scores, or generate a recommendation.
+                AI can review the structure, suggest scores, or turn your results into a
+                recommendation.
               </div>
             </div>
           </div>

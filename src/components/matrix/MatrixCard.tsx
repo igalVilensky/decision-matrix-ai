@@ -14,22 +14,12 @@ type MatrixCardProps = {
 
 export const MatrixCard = ({ matrix, onOpen, onDuplicate, onDelete }: MatrixCardProps) => (
   <Card className="flex h-full flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-lift">
-    <div className="flex items-start justify-between gap-4">
-      <div className="min-w-0">
-        <Badge tone="green">{matrix.category || "General"}</Badge>
-        <h3 className="mt-3 truncate text-lg font-bold text-ink-900">{matrix.title}</h3>
-      </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        icon={<Trash2 className="h-4 w-4" />}
-        onClick={() => onDelete(matrix.id)}
-      >
-        Delete matrix
-      </Button>
+    <div className="min-w-0">
+      <Badge tone="green">{matrix.category || "General"}</Badge>
+      <h3 className="mt-3 truncate text-lg font-bold text-ink-900">{matrix.title}</h3>
     </div>
     <p className="mt-3 line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-ink-500">
-      {matrix.goal || "No goal added yet."}
+      {matrix.goal || "Start by adding the choices you want to compare."}
     </p>
     <div className="mt-5 grid grid-cols-3 gap-2 text-sm">
       <div className="rounded-lg bg-ink-50 p-3">
@@ -59,6 +49,13 @@ export const MatrixCard = ({ matrix, onOpen, onDuplicate, onDelete }: MatrixCard
         onClick={() => onDuplicate(matrix.id)}
       >
         Duplicate
+      </Button>
+      <Button
+        variant="danger"
+        icon={<Trash2 className="h-4 w-4" />}
+        onClick={() => onDelete(matrix.id)}
+      >
+        Delete
       </Button>
     </div>
   </Card>

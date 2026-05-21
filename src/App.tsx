@@ -199,7 +199,7 @@ export const App = () => {
       return;
     }
 
-    const shouldDelete = window.confirm("Delete this matrix from your Firebase workspace?");
+    const shouldDelete = window.confirm("Delete this matrix? This cannot be undone.");
     if (!shouldDelete) return;
 
     setSaveStatus("saving");
@@ -296,6 +296,7 @@ export const App = () => {
           <MatrixPage
             matrix={activeMatrix}
             matrices={matrices}
+            uid={uid}
             onChange={(matrix) => void handleSaveMatrix(matrix)}
             onImportMatrix={handleImportMatrix}
             onBackHome={navigateHome}
@@ -304,7 +305,7 @@ export const App = () => {
       )}
       <Modal
         title="Create new decision matrix"
-        description="Start blank or use a practical template. Everything can be edited later."
+        description="Answer a few quick prompts, then start guided setup or preload a template."
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
       >
