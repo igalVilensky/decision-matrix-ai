@@ -9,6 +9,7 @@ type AppLayoutProps = {
   activeMatrixId?: string;
   saveStatus?: "idle" | "saving" | "saved" | "error";
   onHome: () => void;
+  onAbout: () => void;
   onNewMatrix: () => void;
   onOpenMatrix: (id: string) => void;
 };
@@ -19,11 +20,17 @@ export const AppLayout = ({
   activeMatrixId,
   saveStatus,
   onHome,
+  onAbout,
   onNewMatrix,
   onOpenMatrix
 }: AppLayoutProps) => (
   <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#d6f7ee_0,#f5f7fb_32rem)] text-ink-900">
-    <Header onHome={onHome} onNewMatrix={onNewMatrix} saveStatus={saveStatus} />
+    <Header
+      onHome={onHome}
+      onAbout={onAbout}
+      onNewMatrix={onNewMatrix}
+      saveStatus={saveStatus}
+    />
     <div className="flex">
       <Sidebar
         matrices={matrices}

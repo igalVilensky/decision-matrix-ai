@@ -1,14 +1,15 @@
-import { Plus, Sparkles } from "lucide-react";
+import { Info, Plus, Sparkles } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
 
 type HeaderProps = {
   onHome: () => void;
+  onAbout: () => void;
   onNewMatrix: () => void;
   saveStatus?: "idle" | "saving" | "saved" | "error";
 };
 
-export const Header = ({ onHome, onNewMatrix, saveStatus = "idle" }: HeaderProps) => (
+export const Header = ({ onHome, onAbout, onNewMatrix, saveStatus = "idle" }: HeaderProps) => (
   <header className="sticky top-0 z-30 border-b border-ink-200/80 bg-white/90 backdrop-blur-xl">
     <div className="flex min-h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
       <button
@@ -33,6 +34,9 @@ export const Header = ({ onHome, onNewMatrix, saveStatus = "idle" }: HeaderProps
             {saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Save failed" : "Saving"}
           </Badge>
         ) : null}
+        <Button variant="ghost" icon={<Info className="h-4 w-4" />} onClick={onAbout}>
+          About
+        </Button>
         <Button icon={<Plus className="h-4 w-4" />} onClick={onNewMatrix}>
           New matrix
         </Button>

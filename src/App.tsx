@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AboutCaseStudy } from "./components/about/AboutCaseStudy";
 import { AppLayout } from "./components/layout/AppLayout";
 import { CreateMatrixForm } from "./components/matrix/CreateMatrixForm";
 import { Card } from "./components/ui/Card";
@@ -48,6 +49,7 @@ export const App = () => {
   const [matrices, setMatrices] = useState<DecisionMatrix[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | undefined>();
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const debounceSaveTimer = useRef<number | undefined>();
@@ -406,6 +408,7 @@ export const App = () => {
       activeMatrixId={activeMatrixId}
       saveStatus={saveStatus}
       onHome={navigateHome}
+      onAbout={() => setIsAboutOpen(true)}
       onNewMatrix={() => setIsCreateOpen(true)}
       onOpenMatrix={navigateMatrix}
     >
@@ -471,6 +474,14 @@ export const App = () => {
         onClose={() => setIsCreateOpen(false)}
       >
         <CreateMatrixForm onCreate={(matrix) => void handleCreateMatrix(matrix)} />
+      </Modal>
+      <Modal
+        title="About this project"
+        description="A concise portfolio case study for Decision Matrix AI."
+        isOpen={isAboutOpen}
+        onClose={() => setIsAboutOpen(false)}
+      >
+        <AboutCaseStudy />
       </Modal>
     </AppLayout>
   );
