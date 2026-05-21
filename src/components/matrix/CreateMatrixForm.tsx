@@ -372,7 +372,9 @@ export const CreateMatrixForm = ({ onCreate }: CreateMatrixFormProps) => {
 
       const removeInitialOption = (index: number) => {
         setInitialOptions((currentOptions) =>
-          currentOptions.filter((_, optionIndex) => optionIndex !== index)
+          currentOptions.length <= 1
+            ? [""]
+            : currentOptions.filter((_, optionIndex) => optionIndex !== index)
         );
       };
 
@@ -438,9 +440,10 @@ export const CreateMatrixForm = ({ onCreate }: CreateMatrixFormProps) => {
             onClick={() => setStartMode("guided")}
           >
             <FilePlus2 className="mb-3 h-5 w-5 text-brand-600" />
-            <div className="font-bold text-ink-900">Start guided setup</div>
+            <div className="font-bold text-ink-900">Start with my setup</div>
             <p className="mt-1 text-sm leading-6 text-ink-500">
-              Start clean and let the app guide options, criteria, scores, and review.
+              Use your description and any options you added, then guide you through criteria,
+              scores, and review.
             </p>
           </button>
           <button
