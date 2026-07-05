@@ -30,19 +30,19 @@ This project demonstrates how AI can be used as a decision-support layer instead
 
 ### Home / Dashboard
 
-![Decision Matrix AI home screen](./docs/screenshots/home.png)
+![Decision Matrix AI home screen](./home.png)
 
 ### Matrix Overview
 
-![Decision Matrix AI matrix overview](./docs/screenshots/natrix.png)
+![Decision Matrix AI matrix overview](./matrix.png)
 
 ### Matrix Scoring
 
-![Matrix scoring view](./docs/screenshots/scoring.png)
+![Matrix scoring view](./scoring.png)
 
 ### AI Review
 
-![AI review panel](./docs/screenshots/ai-review.png)
+![AI review panel](./ai-review.png)
 
 ---
 
